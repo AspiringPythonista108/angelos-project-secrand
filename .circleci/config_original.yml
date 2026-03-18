@@ -206,7 +206,7 @@ jobs:
       - kover_html_report
       - cleanup
   build-and-test:
-    executor: windows
+    executor: << pipeline.parameters.platform >>
     environment:
       GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.jvmargs=-Xmx4g"
     steps:
