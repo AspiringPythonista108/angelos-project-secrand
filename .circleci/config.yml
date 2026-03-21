@@ -32,6 +32,7 @@ commands:
           command: |
             GRADLE_VERSION=$(grep -o 'gradle-[0-9.]*' gradle/wrapper/gradle-wrapper.properties | cut -d- -f2)
             echo "$GRADLE_VERSION" > /tmp/gradle-cache-key.txt
+            ls /tmp/gradle-cache-key.txt
   extract_kotlin_version:
     steps:
       - run:
