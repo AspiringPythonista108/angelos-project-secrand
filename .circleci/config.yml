@@ -117,7 +117,7 @@ commands:
 
             echo "STEP 2: normalize slashes"
             circleci tests glob "library/src/commonTest/kotlin/**/*Test.kt" "library/src/jvmTest/kotlin/**/*Test.kt" \
-            | sed 's@\\@/@g'
+            | tr '\\' '/'
 
             echo "STEP 3: strip source roots"
             circleci tests glob "library/src/commonTest/kotlin/**/*Test.kt" "library/src/jvmTest/kotlin/**/*Test.kt" \
