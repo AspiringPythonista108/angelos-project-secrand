@@ -91,6 +91,7 @@ commands:
             cd library
             # Get list of classnames of tests that should run on this node.
             circleci tests glob "library/src/commonTest/kotlin/**/*Test.kt" "library/src/jvmTest/kotlin/**/*Test.kt" | cut -c 1- | sed 's@/@.@g' | sed 's/.\{3\}$//' | circleci tests run --command=">classnames.txt xargs echo" --verbose --split-by=timings --timings-type=classname
+            cat classnames.txt
 
             # If this is a re-run and it is a parallel run that does not have tests to run, halt execution of this parallel run
             [ -s classnames.txt ] || circleci-agent step halt
