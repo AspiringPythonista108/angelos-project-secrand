@@ -85,16 +85,28 @@ commands:
           command: ./gradlew build --no-daemon --stacktrace -x test
   run_tests:
     steps:
+      # - run:
+      #     name: Debug test paths
+      #     command: |
+      #       pwd
+      #       ls
+      #       ls library || true
+      #       find . -type f | grep 'Test\.kt$' || true
+      #       circleci tests glob "library/src/commonTest/kotlin/**/*Test.kt" "library/src/jvmTest/kotlin/**/*Test.kt" | tee /tmp/test-files.txt
+      #       echo "Matched files:"
+      #       cat /tmp/test-files.txt || true
       - run:
-          name: Debug test paths
+          name: Debug CircleCI test glob on Windows
+          shell: bash.exe
           command: |
+            echo "PWD:"
             pwd
-            ls
-            ls library || true
-            find . -type f | grep 'Test\.kt$' || true
-            circleci tests glob "library/src/commonTest/kotlin/**/*Test.kt" "library/src/jvmTest/kotlin/**/*Test.kt" | tee /tmp/test-files.txt
-            echo "Matched files:"
-            cat /tmp/test-files.txt || true
+
+            echo "Backslash glob:"
+            circleci tests glob "library\\src\\commonTest\\kotlin\\**\\*Test.kt" "library\\src\\jvmTest\\kotlin\\**\\*Test.kt"
+
+            echo "Forward slash glob:"
+            circleci tests glob "library/src/commonTest/kotlin/**/*Test.kt" "library/src/jvmTest/kotlin/**/*Test.kt"
       - run:
           name: Split tests
           command: |
