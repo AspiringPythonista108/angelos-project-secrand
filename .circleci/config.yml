@@ -141,16 +141,14 @@ commands:
             }
       - run:
           name: Run split tests
-          shell: bash.exe
+          shell: powershell.exe
           command: |
-            echo "Classnames selected for this node:"
-            tr -d '\r' < cat classnames.txt
+            Write-Host "Classnames selected for this node:"
+            Get-Content classnames.txt
 
-            tr -d '\r' < classnames.txt \
-            | xargs -n1 -I{} echo ./gradlew :library:jvmTest --tests "{}" --no-daemon --stacktrace --info
-
-            tr -d '\r' < classnames.txt \
-            | xargs -n1 -I{} ./gradlew :library:jvmTest --tests "{}" --no-daemon --stacktrace --info
+            Get-Content classnames.txt | ForEach-Object {
+              & ./gradlew.bat :library:jvmTest --tests "$_" --no-daemon --stacktrace --info
+            }
 
 
             # Format the arguments to "./gradlew jvmTest"
