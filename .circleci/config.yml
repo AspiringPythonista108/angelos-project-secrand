@@ -134,8 +134,11 @@ commands:
                 --timings-type=classname `
                 --verbose
 
-                  # If this is a re-run and it is a parallel run that does not have tests to run, halt execution of this parallel run
-                  [ -s classnames.txt ] || circleci-agent step halt
+            # If this is a re-run and it is a parallel run that does not have tests to run, halt execution of this parallel run
+            # [ -s classnames.txt ] || circleci-agent step halt
+            if (-not (Test-Path classnames.txt) -or -not (Get-Content classnames.txt | Where-Object { $_.Trim() })) {
+              circleci-agent step halt
+            }
       - run:
           name: Run split tests
           command: |
