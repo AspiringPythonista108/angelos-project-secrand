@@ -150,7 +150,7 @@ commands:
               & ./gradlew.bat :library:jvmTest --tests "$_" --no-daemon --stacktrace --info
             }
 
-
+            # Testing another run
             # Format the arguments to "./gradlew jvmTest"
             # GRADLE_ARGS=$(cat library/classnames.txt | awk '{for (i=1; i<=NF; i++) print "--tests",$i}')
             # echo "Prepared arguments for Gradle: $GRADLE_ARGS"
