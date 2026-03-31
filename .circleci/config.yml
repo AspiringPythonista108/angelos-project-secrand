@@ -146,9 +146,9 @@ commands:
             $ErrorActionPreference = "Stop"
 
             Write-Host "Classnames selected for this node:"
-            Get-Content library/classnames.txt
+            Get-Content classnames.txt
 
-            $classes = Get-Content library/classnames.txt | Where-Object { $_.Trim() -ne "" }
+            $classes = Get-Content classnames.txt | Where-Object { $_.Trim() -ne "" }
 
             $gradleArgs = @(":library:jvmTest")
             foreach ($class in $classes) {
