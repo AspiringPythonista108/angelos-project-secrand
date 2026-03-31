@@ -143,22 +143,34 @@ commands:
           name: Run split tests
           shell: powershell.exe
           command: |
-            Write-Host "Classnames selected for this node:"
-            Get-Content classnames.txt
+            $ErrorActionPreference = "Stop"
 
-            Get-Content classnames.txt | ForEach-Object {
-              & ./gradlew.bat :library:jvmTest --tests "$_" --no-daemon --stacktrace --info
+            Write-Host "Classnames selected for this node:"
+            Get-Content library/classnames.txt
+
+            $classes = Get-Content library/classnames.txt | Where-Object { $_.Trim() -ne "" }
+
+            $gradleArgs = @(":library:jvmTest")
+            foreach ($class in $classes) {
+              $gradleArgs += "--tests"
+              $gradleArgs += $class.Trim()
+            }
+            $gradleArgs += "--no-daemon"
+            $gradleArgs += "--stacktrace"
+            $gradleArgs += "--info"
+
+            & ./gradlew.bat @gradleArgs
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Gradle failed with exit code $LASTEXITCODE"
             }
 
-            # Testing another run
-            # Format the arguments to "./gradlew jvmTest"
-            # GRADLE_ARGS=$(cat library/classnames.txt | awk '{for (i=1; i<=NF; i++) print "--tests",$i}')
-            # echo "Prepared arguments for Gradle: $GRADLE_ARGS"
-
-            # ./gradlew :library:jvmTest $GRADLE_ARGS --no-daemon --stacktrace --info # Adjust path to gradlew if needed; use :library: prefix for subproject
-
       - store_test_results:
-          path: library/build/test-results
+          path: library/build/test-results/jvmTest
+
+      - store_artifacts:
+          path: library/build/test-results/jvmTest
+
   publish_to_maven_local:
     steps:
       - run:
