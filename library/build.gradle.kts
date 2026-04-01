@@ -1,5 +1,6 @@
+import java.util.Properties
+
 import com.vanniktech.maven.publish.SonatypeHost
-import java.net.URI
 
 object This {
     const val longName = "Secure Random - Angelos Project™"
@@ -11,12 +12,10 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.vanniktech.mavenPublish)
-    alias(libs.plugins.dokka)
     alias(libs.plugins.kover)
+    alias(libs.plugins.dokka)
 }
 
-group = "org.angproj.sec"
-version = "0.12.6"
 
 kotlin {
     explicitApi()
@@ -92,8 +91,7 @@ android {
 }
 
 mavenPublishing {
-    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
-
+    //publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
     //signAllPublications()
 
     /**
@@ -101,7 +99,26 @@ mavenPublishing {
      * DO NOT USE FOR SONATYPE NEXUS
      * */
     coordinates(group.toString(), rootProject.name, version.toString())
-    //coordinates(group.toString(), version.toString())
+
+    publishing {
+        repositories {
+            maven {
+                name = "Repsy"
+                val localProps = Properties()
+                val localPropsFile = file("${rootProject.projectDir.path}/local.properties")
+                if (localPropsFile.exists()) {
+                    localProps.load(localPropsFile.inputStream())
+                }
+                val repsyUsername = localProps.getProperty("repsy.username") ?: System.getenv("REPSY_USERNAME") ?: ""
+                val repsyPassword = localProps.getProperty("repsy.password") ?: System.getenv("REPSY_PASSWORD") ?: ""
+                credentials {
+                    username = repsyUsername
+                    password = repsyPassword
+                }
+                url = uri("https://repo.repsy.io/$repsyUsername/angelos-project")
+            }
+        }
+    }
 
     pom {
         name.set(This.longName)
@@ -131,16 +148,18 @@ mavenPublishing {
     }
 }
 
-tasks.dokkaHtml {
-    dokkaSourceSets {
-        named("commonMain"){
-            moduleName.set(This.longName)
-            includes.from("Module.md")
-            sourceLink {
-                localDirectory.set(file("src/commonMain/kotlin"))
-                remoteUrl.set(URI(This.url + "/tree/master/library/src/commonMain/kotlin").toURL())
-                remoteLineSuffix.set("#L")
-            }
+dokka {
+    dokkaPublications.html {
+        moduleName.set(rootProject.name)
+    }
+
+    pluginsConfiguration.html {
+        footerMessage.set("Copyright (c) 2024-2026 Kristoffer Paulsson.")
+    }
+
+    dokkaSourceSets.commonMain {
+        sourceLink {
+            remoteUrl(This.url + "/tree/main/library")
         }
     }
 }

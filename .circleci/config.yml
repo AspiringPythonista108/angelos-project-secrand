@@ -65,6 +65,10 @@ commands:
             mkdir -p gradle/wrapper
             if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
               GRADLE_VERSION=$(sed -n 's/.*gradle-\(.*\)-bin\.zip.*/\1/p' gradle/wrapper/gradle-wrapper.properties)
+              # If only major.minor (patch zero missing) → actively add .0
+              if [[ $GRADLE_VERSION =~ ^([0-9]+)\.([0-9]+)$ ]]; then
+                GRADLE_VERSION="${GRADLE_VERSION}.0"
+              fi
               curl -L --fail --silent -o gradle/wrapper/gradle-wrapper.jar \
                 "https://raw.githubusercontent.com/gradle/gradle/v${GRADLE_VERSION}/gradle/wrapper/gradle-wrapper.jar"
             fi
@@ -232,6 +236,18 @@ commands:
           key: m2-v1-{{ checksum ".circleci-m2-cache-key.txt" }}
           paths:
             - ~/.m2
+  generate_docs:
+    steps:
+      - run:
+          name: Generate documentation with Dokka
+          command: ./gradlew dokkaGenerateHtml --no-daemon --stacktrace
+  store_docs:
+    steps:
+      - run:
+          name: Archive Dokka Docs
+          command: tar -czvf apidocs.tar.gz -C library/build/dokka/html .
+      - store_artifacts:
+          path: apidocs.tar.gz
   prepare:
     steps:
       - checkout
@@ -285,11 +301,30 @@ jobs:
       - prepare
       - publish_and_backup_maven
       - cleanup
+  gen-docs:
+    executor: << pipeline.parameters.platform >>
+    environment:
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.jvmargs=-Xmx4g"
+    steps:
+      - prepare
+      - generate_docs
+      - store_docs
+      - cleanup
+  publish-to-repsy:
+    executor: gradle
+    environment:
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.jvmargs=-Xmx4g"
+    steps:
+      - prepare
+      - run:
+          name: Publish to Repsy private Maven repository
+          command: ./gradlew publishAllPublicationsToRepsyRepository --no-daemon --stacktrace
+      - cleanup
 
 parameters:
   action:
     type: enum
-    enum: [test, coverage, report]
+    enum: [test, coverage, report, docs, publish]
     default: test
   platform:
     type: enum
@@ -316,3 +351,18 @@ workflows:
       equal: [ test, << pipeline.parameters.action >> ]
     jobs:
       - build-and-test
+  docs:
+    when:
+      equal: [ docs, << pipeline.parameters.action >> ]
+    jobs:
+      - gen-docs
+  build-and-publish:
+    when:
+      equal: [ publish, << pipeline.parameters.action >> ]
+    jobs:
+      - publish-to-repsy:
+          filters:
+            branches:
+              only: main
+            tags:
+              only: /v.*/
