@@ -38,38 +38,38 @@ commands:
       - run:
           name: Extract LocalRepo name
           command: |
-            echo "m2-v1" > .circleci-m2-cache-key.txt
+            echo "m2-v1" > /tmp/m2-cache-key.txt
   extract_gradle_version:
     steps:
       - run:
           name: Extract Gradle version
           command: |
             GRADLE_VERSION=$(grep -o 'gradle-[0-9.]*' gradle/wrapper/gradle-wrapper.properties | cut -d- -f2)
-            echo "$GRADLE_VERSION" > .circleci-gradle-cache-key.txt
+            echo "$GRADLE_VERSION" > /tmp/gradle-cache-key.txt
   extract_kotlin_version:
     steps:
       - run:
           name: Extract Kotlin version
           command: |
             KOTLIN_VERSION=$(grep 'kotlin =' gradle/libs.versions.toml | cut -d'"' -f2)
-            echo "$KOTLIN_VERSION" > .circleci-kotlin-cache-key.txt
+            echo "$KOTLIN_VERSION" > /tmp/kotlin-cache-key.txt
   restore_gradle_cache:
     steps:
       - restore_cache:
           keys:
-            - gradle-v1-{{ checksum ".circleci-gradle-cache-key.txt" }}
+            - gradle-v1-{{ checksum "/tmp/gradle-cache-key.txt" }}
             - gradle-v1-
   restore_konan_cache:
     steps:
       - restore_cache:
           keys:
-            - konan-v1-{{ checksum ".circleci-kotlin-cache-key.txt" }}
+            - konan-v1-{{ checksum "/tmp/kotlin-cache-key.txt" }}
             - konan-v1-
   restore_m2_cache:
     steps:
       - restore_cache:
           keys:
-            - m2-v1-{{ checksum ".circleci-m2-cache-key.txt" }}
+            - m2-v1-{{ checksum "/tmp/m2-cache-key.txt" }}
             - m2-v1-
   ensure_gradle_wrapper:
     steps:
@@ -104,65 +104,28 @@ commands:
   run_tests:
     steps:
       - run:
-          name: Build classnames list (PowerShell)
-          shell: powershell.exe
-          command: |
-            circleci tests glob "library/src/commonTest/kotlin/**/*Test.kt" "library/src/jvmTest/kotlin/**/*Test.kt" `
-            | % {
-                $_ -replace '\\','/' `
-                  -replace '^library/src/commonTest/kotlin/','' `
-                  -replace '^library/src/jvmTest/kotlin/','' `
-                  -replace '/','.' `
-                  -replace '\.kt$',''
-              } `
-            | Tee-Object classnames.txt
-
-            Write-Host "==== CLASSNAMES ===="
-            Get-Content classnames.txt
-      - run:
           name: Split tests
-          shell: powershell.exe
           command: |
-            Get-Content classnames.txt `
-            | circleci tests run `
-                --command="xargs -n1 echo" `
-                --split-by=name `
-                --timings-type=classname `
-                --verbose
-
+            cd library
+            # Get list of classnames of tests that should run on this node.
+            #circleci tests glob "library/src/commonTest/kotlin/**/*Test.kt" "library/src/jvmTest/kotlin/**/*Test.kt" | cut -c 1- | sed 's@/@.@g' | sed 's/.\{3\}$//' | circleci tests run --command=">classnames.txt xargs echo" --verbose --split-by=timings --timings-type=classname
+            circleci tests glob "src/commonTest/kotlin/**/*Test.kt" "src/jvmTest/kotlin/**/*Test.kt" | sed 's#^src/[a-zA-Z]*Test/kotlin/##' | cut -c 1- | sed 's@/@.@g' | sed 's/\.kt$//' | circleci tests run --command=">classnames.txt xargs echo" --verbose --split-by=timings --timings-type=classname
+            
+            
             # If this is a re-run and it is a parallel run that does not have tests to run, halt execution of this parallel run
-            if (-not (Test-Path classnames.txt) -or -not (Get-Content classnames.txt | Where-Object { $_.Trim() })) {
-              circleci-agent step halt
-            }
+            [ -s classnames.txt ] || circleci-agent step halt
       - run:
           name: Run split tests
-          shell: powershell.exe
           command: |
-            $ErrorActionPreference = "Stop"
 
-            Write-Host "Classnames selected for this node:"
-            Get-Content classnames.txt
+            # Format the arguments to "./gradlew jvmTest"
+            GRADLE_ARGS=$(cat library/classnames.txt | awk '{for (i=1; i<=NF; i++) print "--tests",$i}')
+            echo "Prepared arguments for Gradle: $GRADLE_ARGS"
 
-            $classes = Get-Content classnames.txt | Where-Object { $_.Trim() -ne "" }
-
-            $gradleArgs = @(":library:jvmTest")
-            foreach ($class in $classes) {
-              $gradleArgs += "--tests"
-              $gradleArgs += $class.Trim()
-            }
-            $gradleArgs += "--no-daemon"
-            $gradleArgs += "--stacktrace"
-            $gradleArgs += "--info"
-
-            & ./gradlew.bat @gradleArgs
-
-            if ($LASTEXITCODE -ne 0) {
-              throw "Gradle failed with exit code $LASTEXITCODE"
-            }
+            ./gradlew :library:jvmTest $GRADLE_ARGS --no-daemon --stacktrace  # Adjust path to gradlew if needed; use :library: prefix for subproject
 
       - store_test_results:
-          path: library/build/test-results/jvmTest
-
+          path: library/build/test-results
   publish_to_maven_local:
     steps:
       - run:
@@ -208,20 +171,20 @@ commands:
   save_gradle_cache:
     steps:
       - save_cache:
-          key: gradle-v1-{{ checksum ".circleci-gradle-cache-key.txt" }}
+          key: gradle-v1-{{ checksum "/tmp/gradle-cache-key.txt" }}
           paths:
             - ~/.gradle/caches
             - ~/.gradle/wrapper
   save_konan_cache:
     steps:
       - save_cache:
-          key: konan-v1-{{ checksum ".circleci-kotlin-cache-key.txt" }}
+          key: konan-v1-{{ checksum "/tmp/kotlin-cache-key.txt" }}
           paths:
             - ~/.konan
   save_m2_cache:
     steps:
       - save_cache:
-          key: m2-v1-{{ checksum ".circleci-m2-cache-key.txt" }}
+          key: m2-v1-{{ checksum "/tmp/m2-cache-key.txt" }}
           paths:
             - ~/.m2
   generate_docs:
@@ -273,7 +236,7 @@ jobs:
       - kover_html_report
       - cleanup
   build-and-test:
-    executor: windows # << pipeline.parameters.platform >>
+    executor: << pipeline.parameters.platform >>
     environment:
       GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.jvmargs=-Xmx4g"
     steps:
@@ -290,7 +253,7 @@ jobs:
       - publish_and_backup_maven
       - cleanup
   gen-docs:
-    executor: windows # << pipeline.parameters.platform >>
+    executor: << pipeline.parameters.platform >>
     environment:
       GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.jvmargs=-Xmx4g"
     steps:
